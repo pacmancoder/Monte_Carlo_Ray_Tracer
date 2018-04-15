@@ -1,19 +1,20 @@
 #include "../include/Object3D.h"
 
-#include "../external_libraries/common_include/objloader.h"
 #include "../external_libraries/common_include/vboindexer.h"
 
+#include <cmath>
 #include <random>
 #include <iostream>
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
+#include <glm/gtx/transform.hpp>
 
 // --- Object3D class functions --- //
 
 Object3D::Object3D(Material* material) : 
-	material_(material)
-{}
+	material_(material) {}
 
 Material Object3D::material() const
 {
@@ -21,37 +22,38 @@ Material Object3D::material() const
 }
 
 // --- Mesh class functions --- //
-
-Mesh::Mesh(glm::mat4 transform, const char* file_path, Material * material) :
-	Object3D(material)
+Mesh::Mesh(
+		Material * material,
+		glm::mat4 transform,
+		std::vector<glm::vec3>&& positions,
+		std::vector<glm::vec3>&& normals,
+		std::vector<glm::vec2>&& uvs) :
+	Object3D(material),
+	positions_(),
+	uvs_(),
+	normals_(),
+	indices_(),
+	transform_(transform),
+	ot_aabb_(nullptr)
 {
-	transform_ = transform;
-
-	std::vector<glm::vec3> tmp_positions;
-	std::vector<glm::vec2> tmp_uvs;
-	std::vector<glm::vec3> tmp_normals;
-
-	if(!loadOBJ(file_path, tmp_positions, tmp_uvs, tmp_normals))
-		exit (EXIT_FAILURE);
-	for (int i = 0; i < tmp_positions.size(); ++i)
+	for (size_t i = 0; i < positions.size(); ++i)
 	{
-		tmp_positions[i] = glm::vec3(transform_ * glm::vec4(tmp_positions[i], 1));
-		tmp_normals[i] = glm::vec3(transform_ * glm::vec4(tmp_normals[i], 0));
+		positions[i] = glm::vec3(transform_ * glm::vec4(positions[i], 1));
+		normals[i] = glm::vec3(transform_ * glm::vec4(normals[i], 0));
 	}
+
 	indexVBO(
-		tmp_positions,
-		tmp_uvs,
-		tmp_normals,
+			// inputs
+			positions,
+			uvs,
+			normals,
+			// outputs
+			indices_,
+			positions_,
+			uvs_,
+			normals_);
 
-		indices_,
-		positions_,
-		uvs_,
-		normals_);
-
-
-	std::cout << "Building octree for mesh." << std::endl;
-	ot_aabb_ = new OctTreeAABB(this);
-	std::cout << "Octree built." << std::endl;
+	ot_aabb_ = std::make_unique<OctTreeAABB>(this);
 }
 
 bool Mesh::intersect(IntersectionData* id, Ray r) const
@@ -67,7 +69,7 @@ glm::mat4 Mesh::getTransform() const
 glm::vec3 Mesh::getMinPosition() const
 {
 	glm::vec3 min = positions_[0];
-	for (int i = 1; i < positions_.size(); ++i)
+	for (size_t i = 1; i < positions_.size(); ++i)
 	{
 		glm::vec3 p = positions_[i];
 		min.x = p.x < min.x ? p.x : min.x;
@@ -80,7 +82,7 @@ glm::vec3 Mesh::getMinPosition() const
 glm::vec3 Mesh::getMaxPosition() const
 {
 	glm::vec3 max = positions_[0];
-	for (int i = 1; i < positions_.size(); ++i)
+	for (size_t i = 1; i < positions_.size(); ++i)
 	{
 		glm::vec3 p = positions_[i];
 		max.x = p.x > max.x ? p.x : max.x;
@@ -90,27 +92,28 @@ glm::vec3 Mesh::getMaxPosition() const
 	return max;
 }
 
-int Mesh::getNumberOfTriangles() const
+size_t Mesh::getNumberOfTriangles() const
 {
 	return indices_.size() / 3;
 }
 
 // --- Sphere class functions --- //
 
-Sphere::Sphere(glm::vec3 position, float radius, Material* material) : 
-	Object3D(material), POSITION_(position), RADIUS_(radius)
-{}
+Sphere::Sphere(Material* material, glm::vec3 position, float radius) :
+	Object3D(material),
+	position_(position),
+	radius_(radius) {}
 
 bool Sphere::intersect(IntersectionData* id, Ray r) const
 {
 	// if to_square is negative we have imaginary solutions,
 	// hence no intersection
 	// p_half comes from the p-q formula (p/2)
-	float p_half = glm::dot((r.origin - POSITION_), r.direction);
-	float to_square = 
-		pow(p_half, 2) + 
-		pow(RADIUS_, 2) - 
-		pow(glm::length(r.origin - POSITION_), 2);
+	float p_half = glm::dot((r.origin - position_), r.direction);
+	float to_square = static_cast<float>(
+		std::pow(p_half, 2) +
+		std::pow(radius_, 2) -
+		std::pow(glm::length(r.origin - position_), 2));
 	float t; // parameter that tells us where on the ray the intersection is
 	glm::vec3 n; // normal of the intersection point on the surface
 	if (to_square < 0)
@@ -120,13 +123,13 @@ bool Sphere::intersect(IntersectionData* id, Ray r) const
 	// One or two intersection points, if two intersection points,
 	// we choose the closest one that gives a positive t
 	{
-		t = -p_half - sqrt(to_square); // First the one on the front face
+		t = static_cast<float>(-p_half - std::sqrt(to_square)); // First the one on the front face
 		if (t < 0) // if we are inside the sphere
 		{
 			// the intersection is on the inside of the sphere
-			t = -p_half + sqrt(to_square);
+			t = static_cast<float>(-p_half + std::sqrt(to_square));
 		}
-		n = r.origin + t*r.direction - POSITION_;
+		n = r.origin + t*r.direction - position_;
 	}
 	if (t >= 0) // t needs to be positive to travel forward on the ray
 	{
@@ -142,31 +145,26 @@ glm::vec3 Sphere::getPointOnSurface(float u, float v) const
 {
 	// Uniform over a sphere
 	float inclination = glm::acos(1 - 2 * u);
-	float azimuth = 2 * M_PI * v;
+	auto azimuth = static_cast<float>(2 * M_PI * v);
 
-	glm::vec3 random_direction = glm::vec3(1,0,0);
-	random_direction = glm::normalize(glm::rotate(
-		random_direction,
-		inclination,
-		glm::vec3(0,1,0)));
-	random_direction = glm::normalize(glm::rotate(
-		random_direction,
-		azimuth,
-		glm::vec3(1,0,0)));
+    glm::vec3 random_direction = glm::normalize(glm::vec3(
+            glm::rotate(inclination, glm::vec3(0,1,0)) * glm::vec4(1, 0, 0, 0)));
 
-	return POSITION_ + random_direction * RADIUS_;
+    random_direction = glm::normalize(glm::vec3(
+            glm::rotate(azimuth, glm::vec3(1, 0, 0)) * glm::vec4(random_direction, 0)));
+
+	return position_ + random_direction * radius_;
 }
 
 // --- Plane class functions --- //
 
-Plane::Plane(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, Material* material) : 
+Plane::Plane(Material* material, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) :
 	Object3D(material),
-	P0_(p0),
-	P1_(p1),
-	P2_(p2),
-	NORMAL_(glm::normalize(glm::cross(p0 - p1, p0 - p2))),
-	AREA_(glm::length(glm::cross(p0 - p1, p0 - p2)))
-{}
+	p0_(p0),
+	p1_(p1),
+	p2_(p2),
+	normal_(glm::normalize(glm::cross(p0 - p1, p0 - p2))),
+	area_(glm::length(glm::cross(p0 - p1, p0 - p2))) {}
 
 bool Plane::intersect(IntersectionData* id, Ray r) const
 {
@@ -178,8 +176,8 @@ bool Plane::intersect(IntersectionData* id, Ray r) const
 	float t;
 
 	// Find vectors for two edges sharing P0_
-	e1 = P1_ - P0_;
-	e2 = P2_ - P0_;
+	e1 = p1_ - p0_;
+	e2 = p2_ - p0_;
 	// Begin calculating determinant - also used to calculate u parameter
 	P = glm::cross(r.direction, e2);
 	// if determinant is near zero, ray lies in plane of triangle
@@ -189,7 +187,7 @@ bool Plane::intersect(IntersectionData* id, Ray r) const
 		inv_det = 1.f / det;
 
 	// calculate distance from P0_ to ray origin
-	T = r.origin - P0_;
+	T = r.origin - p0_;
 	Q = glm::cross(T, e1);
 
 	// Calculate u parameter and test bound
@@ -214,24 +212,24 @@ bool Plane::intersect(IntersectionData* id, Ray r) const
 
 glm::vec3 Plane::getPointOnSurface(float u, float v) const
 {
-	glm::vec3 v1 = P1_ - P0_;
-	glm::vec3 v2 = P2_ - P0_;
-	return P0_ + u * v1 + v * v2;
+	glm::vec3 v1 = p1_ - p0_;
+	glm::vec3 v2 = p2_ - p0_;
+	return p0_ + u * v1 + v * v2;
 }
 
 float Plane::getArea() const
 {
-	return AREA_;
+	return area_;
 }
 
 glm::vec3 Plane::getNormal() const
 {
-	return NORMAL_;
+	return normal_;
 }
 
 glm::vec3 Plane::getFirstTangent() const
 {
-	return glm::normalize(P1_ - P0_);
+	return glm::normalize(p1_ - p0_);
 }
 
 // --- LightSource class functions --- //
@@ -242,8 +240,8 @@ LightSource::LightSource(
 	glm::vec3 p2,
 	float flux,
 	SpectralDistribution color) :
-	emitter_(p0, p1, p2, NULL),
-	radiosity(flux / emitter_.getArea() * color)
+	emitter_(nullptr, p0, p1, p2),
+	radiosity_(flux / emitter_.getArea() * color)
 {}
 
 bool LightSource::intersect(LightSourceIntersectionData* light_id, Ray r)
@@ -253,7 +251,7 @@ bool LightSource::intersect(LightSourceIntersectionData* light_id, Ray r)
 	{
 		light_id->normal = id.normal;
 		light_id->t = id.t;
-		light_id->radiosity = radiosity;
+		light_id->radiosity = radiosity_;
 		light_id->area = getArea();
 		return true;
 	}
@@ -261,7 +259,7 @@ bool LightSource::intersect(LightSourceIntersectionData* light_id, Ray r)
 		return false;
 }
 
-glm::vec3 LightSource::getPointOnSurface(float u, float v)
+glm::vec3 LightSource::getPointOnSurface(float u, float v) const
 {
 	return emitter_.getPointOnSurface(u, v);
 }
@@ -294,18 +292,16 @@ Ray LightSource::shootLightRay()
 	float rand2 = dis(gen);
 
 	// Uniform distribution
-	float inclination = acos(sqrt(rand1));//glm::acos(1 - rand1);//glm::acos(1 -  2 * (*dis_)(*gen_));
-	float azimuth = 2 * M_PI * rand2;
+	//glm::acos(1 - rand1);//glm::acos(1 -  2 * (*dis_)(*gen_));
+	auto inclination = static_cast<float>(std::acos(std::sqrt(rand1)));
+	auto azimuth = static_cast<float>(2 * M_PI * rand2);
 	// Change the actual vector
-	glm::vec3 random_direction = normal;
-	random_direction = glm::normalize(glm::rotate(
-		random_direction,
-		inclination,
-		tangent));
-	random_direction = glm::normalize(glm::rotate(
-		random_direction,
-		azimuth,
-		normal));
+
+    glm::vec3 random_direction = glm::normalize(glm::vec3(
+            glm::rotate(inclination, tangent) * glm::vec4(normal, 0)));
+
+    random_direction = glm::normalize(glm::vec3(
+            glm::rotate(azimuth, normal) * glm::vec4(random_direction, 0)));
 
 	r.direction = random_direction;
 	r.material = Material::air();

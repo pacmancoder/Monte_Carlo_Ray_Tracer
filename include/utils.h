@@ -1,14 +1,14 @@
-#ifndef UTILS_H
-#define UTILS_H
+#pragma once
 
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
+
+#include <iostream>
 
 class SpectralDistribution
 {
 public:
 	SpectralDistribution();
-	~SpectralDistribution(){};
 
 	float norm() const;
 
@@ -19,7 +19,7 @@ public:
 	friend SpectralDistribution operator*(
 		float f,
 		const SpectralDistribution& sd);
-	float& operator[](const int i);
+	float& operator[](int i);
 	SpectralDistribution operator+(const SpectralDistribution& sd) const;
 	SpectralDistribution operator-(const SpectralDistribution& sd) const;
 	SpectralDistribution operator^(const float& f) const;
@@ -73,7 +73,7 @@ struct Photon
 	glm::vec3 position;
 	glm::vec3 direction_in;
 	SpectralDistribution delta_flux; // [Watts]
-	static const float RADIUS;
+	static const float radius;
 };
 
 struct KDTreeNode
@@ -121,6 +121,3 @@ SpectralDistribution evaluateOrenNayarBRDF(
 	glm::vec3 normal,
 	SpectralDistribution albedo,
 	float roughness);
-
-
-#endif // UTILS_H

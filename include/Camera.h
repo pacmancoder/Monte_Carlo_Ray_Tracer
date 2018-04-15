@@ -1,5 +1,4 @@
-#ifndef CAMERA_H
-#define CAMERA_H
+#pragma once
 
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
@@ -9,32 +8,26 @@
 class Camera
 {
 public:
-	glm::vec3 eye;
-	glm::vec3 center;
-	glm::vec3 up;
-	float fov;
+	glm::vec3 eye_;
+	glm::vec3 center_;
+	glm::vec3 up_;
+	float fov_;
 	glm::mat4 VP_inv;
 
-	const int WIDTH;
-	const int HEIGHT;
+	const int width_;
+	const int height_;
 
 	Camera(
-		const glm::vec3 eye,
-		const glm::vec3 center,
-		const glm::vec3 up,
-		const float fov,
-		const int width,
-		const int height);
-	~Camera(){};
+		glm::vec3 eye,
+		glm::vec3 center,
+		glm::vec3 up,
+		float fov,
+		int width,
+		int height);
 
 	Ray castRay(
-		const int pixel_x, // [0, WIDTH_ - 1]
-		const int pixel_y, // [0, HEIGHT_ - 1]
-		const float parameter_x, // [-0.5, 0.5]
-		const float parameter_y); // [-0.5, 0.5]
-
-	int getWidth();
-	int getHeight();
+		int pixel_x, // [0, WIDTH_ - 1]
+		int pixel_y, // [0, HEIGHT_ - 1]
+		float parameter_x, // [-0.5, 0.5]
+		float parameter_y); // [-0.5, 0.5]
 };
-
-#endif // CAMERA_H

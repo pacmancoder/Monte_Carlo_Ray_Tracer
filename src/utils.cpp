@@ -1,36 +1,34 @@
+#include <cmath>
 #include <string>
 #include <iostream>
 
 #include "../include/utils.h"
 
-const float Photon::RADIUS = 0.1;
+const float Photon::radius = 0.1;
 
-SpectralDistribution::SpectralDistribution()
-{
-	for (int i = 0; i < N_WAVELENGTHS; ++i)
-	{
-		data[i] = 0;
-	}
-}
+SpectralDistribution::SpectralDistribution() :
+    data{0, 0, 0} {}
 
 float SpectralDistribution::norm() const
 {
 	float sum = 0;
-	for (int i = 0; i < N_WAVELENGTHS; ++i)
+
+	for(const auto& wave : data)
 	{
-		sum += data[i];
+		sum += wave;
 	}
+
 	return sum / N_WAVELENGTHS;
 }
 
 std::ostream& operator<<(std::ostream& os, const SpectralDistribution& sd)
 {
 	os << "[ ";
-	for (int i = 0; i < sd.N_WAVELENGTHS - 1; ++i)
+	for (int i = 0; i < SpectralDistribution::N_WAVELENGTHS - 1; ++i)
 	{
 		os << sd.data[i] << ", ";
 	}
-	os << sd.data[sd.N_WAVELENGTHS - 1] << "]";
+	os << sd.data[SpectralDistribution::N_WAVELENGTHS - 1] << "]";
 	return os;
 }
 
@@ -39,7 +37,7 @@ SpectralDistribution operator*(float f, const SpectralDistribution& sd)
 	return sd * f;
 }
 
-float& SpectralDistribution::operator[](const int i)
+float& SpectralDistribution::operator[](int i)
 {
 	return data[i];
 }
@@ -69,7 +67,7 @@ SpectralDistribution SpectralDistribution::operator^(const float& f) const
 	SpectralDistribution to_return;
 	for (int i = 0; i < N_WAVELENGTHS; ++i)
 	{
-		to_return.data[i] = pow(data[i], f);
+		to_return.data[i] = static_cast<float>(std::pow(data[i], f));
 	}
 	return to_return;
 }
@@ -135,19 +133,21 @@ SpectralDistribution SpectralDistribution::operator*=(const SpectralDistribution
 
 SpectralDistribution SpectralDistribution::operator/=(const float& f)
 {
-	for (int i = 0; i < N_WAVELENGTHS; ++i)
+	for (auto& wave : data)
 	{
-		data[i] = data[i] / f;
+		wave /= f;
 	}
+
 	return *this;
 }
 
 SpectralDistribution SpectralDistribution::operator*=(const float& f)
 {
-	for (int i = 0; i < N_WAVELENGTHS; ++i)
+	for (auto& wave : data)
 	{
-		data[i] = data[i] * f;
+		wave *= f;
 	}
+
 	return *this;
 }
 
@@ -182,8 +182,8 @@ SpectralDistribution evaluateOrenNayarBRDF(
 	float roughness)
 {
 	float sigma2 = roughness * roughness;
-	float A = 1 - 0.5 * sigma2 / (sigma2 + 0.57);
-	float B = 0.45 * sigma2 / (sigma2 + 0.09);
+	auto A = static_cast<float>(1 - 0.5 * sigma2 / (sigma2 + 0.57));
+	auto B = static_cast<float>(0.45 * sigma2 / (sigma2 + 0.09));
 	float cos_theta_d1 = glm::dot(d1, normal);
 	float cos_theta_d2 = glm::dot(d2, normal);
 	float theta = glm::acos(cos_theta_d2);

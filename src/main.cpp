@@ -1,8 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <cmath>
-#include <stdio.h>
-#include <time.h>
+#include <cstdio>
+#include <ctime>
 
 #include <glm/glm.hpp>
 #include <omp.h>
@@ -10,31 +10,7 @@
 #include "../include/Camera.h"
 #include "../include/Scene.h"
 
-int savePPM(
-	const char* file_name,
-	const int width,
-	const int height,
-	unsigned char* data)
-{
-	FILE *fp = fopen(file_name, "wb"); // b - binary mode
-	fprintf(fp, "P6\n%d %d\n255\n", width, height);
-	fwrite(data, 1, width * height * 3, fp);
-	fclose(fp);
-	return EXIT_SUCCESS;
-}
-
-// Get current date/time, format is YYYY-MM-DD.HH:mm:ss
-const std::string currentDateTime() {
-    time_t     now = time(0);
-    struct tm  tstruct;
-    char       buf[80];
-    tstruct = *localtime(&now);
-    strftime(buf, sizeof(buf), "%Y-%m-%d-%X", &tstruct);
-
-    return buf;
-}
-
-int main(int argc, char const *argv[])
+int main()
 {
 	time_t time_start, time_now, rendertime_start;
 	time(&time_start);
@@ -54,16 +30,16 @@ int main(int argc, char const *argv[])
 		M_PI / 3, // Field of view in radians
 		WIDTH, // pixel width
 		HEIGHT); // pixel height
-	glm::vec3 camera_plane_normal = glm::normalize(c.center - c.eye);
+	glm::vec3 camera_plane_normal = glm::normalize(c.center_ - c.eye_);
 
 	// 3D objects are contained in the Scene object
-	Scene s(argv[1]);
+	Scene s;
 
 	// irradiance_values will hold image data
-	SpectralDistribution* irradiance_values = new SpectralDistribution[c.WIDTH * c.HEIGHT];
+    std::vector<SpectralDistribution> irradiance_values(static_cast<size_t>(c.width_ * c.height_));
+
 	// irradiance_values need to be converted to rgb pixel data for displaying
-	unsigned char* pixel_values =
-		new unsigned char[c.WIDTH * c.HEIGHT * 3]; // w * h * rgb
+    std::vector<uint8_t> pixel_values(c.width_ * c.height_ * 3, 0);
 
 	std::random_device rd;
 	std::mt19937 gen(rd());
@@ -81,13 +57,13 @@ int main(int argc, char const *argv[])
 	double prerender_time = difftime(rendertime_start, time_start);
 
 	// Loop through all pixels to calculate their irradiance_values by ray-tracing
-	for (int x = 0; x < c.WIDTH; ++x)
+	for (int x = 0; x < c.width_; ++x)
 	{
 		// Parallellize the for loop with openMP.
 		#pragma omp parallel for
-		for (int y = 0; y < c.HEIGHT; ++y)
+		for (int y = 0; y < c.height_; ++y)
 		{
-			int index = (x + y * c.WIDTH);
+			int index = (x + y * c.width_);
 			SpectralDistribution sd;
 			if (SUB_SAMPLING_DIRECT_SPECULAR)
 			{
@@ -95,10 +71,10 @@ int main(int argc, char const *argv[])
 				{
 					Ray r = c.castRay(
 						x, // Pixel x
-						(c.HEIGHT - y - 1), // Pixel y 
+						(c.height_ - y - 1), // Pixel y
 						dis(gen), // Parameter x (>= -0.5 and < 0.5), for subsampling
 						dis(gen)); // Parameter y (>= -0.5 and < 0.5), for subsampling
-					sd += s.traceRay(r, Scene::WHITTED_SPECULAR) * glm::dot(r.direction, camera_plane_normal);
+					sd += s.traceRay(r, Scene::RenderMode::WHITTED_SPECULAR) * glm::dot(r.direction, camera_plane_normal);
 				}
 				irradiance_values[index] += sd / SUB_SAMPLING_DIRECT_SPECULAR * (2 * M_PI);				
 			}
@@ -109,10 +85,10 @@ int main(int argc, char const *argv[])
 				{
 					Ray r = c.castRay(
 						x, // Pixel x
-						(c.HEIGHT - y - 1), // Pixel y 
+						(c.height_ - y - 1), // Pixel y
 						dis(gen), // Parameter x (>= -0.5 and < 0.5), for subsampling
 						dis(gen)); // Parameter y (>= -0.5 and < 0.5), for subsampling
-					sd += s.traceRay(r, Scene::CAUSTICS) * glm::dot(r.direction, camera_plane_normal);
+					sd += s.traceRay(r, Scene::RenderMode::CAUSTICS) * glm::dot(r.direction, camera_plane_normal);
 				}
 				irradiance_values[index] += sd / SUB_SAMPLING_CAUSTICS * (2 * M_PI);
 			}
@@ -123,17 +99,17 @@ int main(int argc, char const *argv[])
 				{
 					Ray r = c.castRay(
 						x, // Pixel x
-						(c.HEIGHT - y - 1), // Pixel y 
+						(c.height_ - y - 1), // Pixel y
 						dis(gen), // Parameter x (>= -0.5 and < 0.5), for subsampling
 						dis(gen)); // Parameter y (>= -0.5 and < 0.5), for subsampling
-					sd += s.traceRay(r, Scene::MONTE_CARLO) * glm::dot(r.direction, camera_plane_normal);
+					sd += s.traceRay(r, Scene::RenderMode::MONTE_CARLO) * glm::dot(r.direction, camera_plane_normal);
 				}
 				irradiance_values[index] += sd / SUB_SAMPLING_MONTE_CARLO * (2 * M_PI);
 			}
 		}
 
 		// To show how much time we have left.
-		rendering_percent_finished = (x+1) * 100 / float(c.WIDTH);
+		rendering_percent_finished = (x+1) * 100 / float(c.width_);
 	  	time(&time_now);
 		double rendering_time_elapsed = difftime(time_now, rendertime_start);
 		double rendering_time_left = (rendering_time_elapsed / rendering_percent_finished) *
@@ -179,51 +155,20 @@ int main(int argc, char const *argv[])
 
 	// Convert to byte data
 	// Gamma correction
-	float gamma = 1 / 2.2;
-	for (int x = 0; x < c.WIDTH; ++x)
+	auto gamma = static_cast<float>(1 / 2.2);
+	for (int x = 0; x < c.width_; ++x)
 	{
-		for (int y = 0; y < c.HEIGHT; ++y)
+		for (int y = 0; y < c.height_; ++y)
 		{
-			int index = (x + y * c.WIDTH);
-			pixel_values[index * 3 + 0] = char(int(glm::clamp(
-				glm::pow(irradiance_values[index][0],gamma), 0.0f, 1.0f) * 255)); // Red
-			pixel_values[index * 3 + 1] = char(int(glm::clamp(
-				glm::pow(irradiance_values[index][1],gamma), 0.0f, 1.0f) * 255)); // Green
-			pixel_values[index * 3 + 2] = char(int(glm::clamp(
-				glm::pow(irradiance_values[index][2],gamma), 0.0f, 1.0f) * 255)); // Blue
+			int index = (x + y * c.width_);
+			pixel_values[index * 3 + 0] = static_cast<unsigned char>(
+			        glm::clamp(glm::pow(irradiance_values[index][0],gamma), 0.0f, 1.0f) * 255); // Red
+            pixel_values[index * 3 + 1] = static_cast<unsigned char>(
+                    glm::clamp(glm::pow(irradiance_values[index][1],gamma), 0.0f, 1.0f) * 255); // Green
+            pixel_values[index * 3 + 2] = static_cast<unsigned char>(
+                    glm::clamp(glm::pow(irradiance_values[index][2],gamma), 0.0f, 1.0f) * 255); // Blue
 		}
 	}
 
-	std::string date_time = currentDateTime();
-	std::string file_name = date_time + ".ppm";
-  
-	// Save the image data to file
-	savePPM(file_name.c_str(), WIDTH, HEIGHT, pixel_values);
-
-	// Save information in a text file
-	std::ofstream myfile;
-	myfile.open (date_time + ".txt");
-	myfile << "Rendered file information:\n\n";
-	myfile << "File name                    : " + date_time + ".ppm\n";
-	myfile << "Rendering time               : " + rendering_time_string +"\n";
-	myfile << "Prerendering time            : " + prerender_time_string +"\n";
-	myfile << "Resolution                   : " + std::to_string(WIDTH) + " x " + std::to_string(HEIGHT) + "\n";
-	myfile << "Caustic sub sampling         : " + std::to_string(SUB_SAMPLING_CAUSTICS) + "\n";
-	myfile << "Monte Carlo sub sampling     : " + std::to_string(SUB_SAMPLING_MONTE_CARLO) + "\n";
-	myfile << "Direct specular sub sampling : " + std::to_string(SUB_SAMPLING_DIRECT_SPECULAR) + "\n";
-	myfile << "Emitted photons              : " + std::to_string(NUMBER_OF_PHOTONS_EMISSION) + "\n";
-	myfile << "Photons in scene             : " + std::to_string(s.getNumberOfPhotons()) + "\n";
-	myfile << "Objects in scene             : " + std::to_string(s.getNumberOfObjects()) + "\n";
-	myfile << "Spheres in scene             : " + std::to_string(s.getNumberOfSpheres()) + "\n";
-	myfile << "Triangles in scene           : " + std::to_string(s.getNumberOfTriangles()) + "\n";
-	myfile << "Gamma                        : " + std::to_string(gamma) + "\n";
-	myfile.close();
-
-	// Clean up
-	delete [] irradiance_values;
-	delete [] pixel_values;
-  
-	// Make a beep sound
-	std::cout << '\a';
-	return EXIT_SUCCESS;
+    return 0;
 }

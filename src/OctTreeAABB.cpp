@@ -31,23 +31,7 @@ bool AABB::intersect(Ray r) const
 		glm::min(glm::max(t1, t2), glm::max(t3, t4)),
 		glm::max(t5, t6));
 
-	// if tmax < 0, ray (line) is intersecting AABB, but whole AABB is behing us
-	if (tmax < 0)
-	{
-	    //*t = tmax;
-	    return false;
-	}
-
-	// if tmin > tmax, ray doesn't intersect AABB
-	if (tmin > tmax)
-	{
-	    //*t = tmax;
-	    return false;
-	}
-
-	//*t = tmin;
-	return true;
-	return false;
+	return (tmax >= 0) && (tmin <= tmax);
 }
 
 bool AABB::intersectTriangle(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) const
@@ -66,18 +50,19 @@ bool AABB::intersectTriangle(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) const
 // --- OctNodeAABB class functions --- //
 
 OctNodeAABB::OctNodeAABB(
-	OctNodeAABB* parent,
-	int depth,
-	Mesh* mesh,
-	glm::vec3 aabb_min,
-	glm::vec3 aabb_max)
+		OctNodeAABB* parent,
+		int depth,
+		Mesh* mesh,
+		glm::vec3 aabb_min,
+		glm::vec3 aabb_max) :
+	mesh_(mesh),
+	aabb_({aabb_min, aabb_max}),
+	triangle_indices_(),
+	children_()
 {
-	aabb_.min_ = aabb_min;
-	aabb_.max_ = aabb_max;
-	mesh_ = mesh;
 	// Find which triangles are in this AABB
 	// If it has no parent this is the root node
-	std::vector<unsigned int>& index_list =
+	std::vector<size_t>& index_list =
 		!parent ?
 		mesh->indices_ :
 		parent->triangle_indices_;
@@ -96,12 +81,7 @@ OctNodeAABB::OctNodeAABB(
 		}
 	}
 	
-	if (depth == 0 || triangle_indices_.size() <= 3 * 16)
-	{ // Base case
-		for (int i=0; i<8; i++)
-			children_[i] = NULL;
-	}
-	else
+	if (!(depth == 0 || triangle_indices_.size() <= 3 * 16))
 	{ // Continue recursion, create more children
 		glm::vec3 child_aabb_min;
 		glm::vec3 child_aabb_max;
@@ -115,7 +95,7 @@ OctNodeAABB::OctNodeAABB(
 				i%2 	== 0 ? (aabb_min.x + aabb_max.x) / 2 : aabb_max.x,
 				(i/2)%2 == 0 ? (aabb_min.y + aabb_max.y) / 2 : aabb_max.y,
 				(i/4)%2 == 0 ? (aabb_min.z + aabb_max.z) / 2 : aabb_max.z);
-			children_[i] = new OctNodeAABB(
+			children_[i] = std::make_unique<OctNodeAABB>(
 				this,
 				depth - 1,
 				mesh,
@@ -125,21 +105,14 @@ OctNodeAABB::OctNodeAABB(
 	}
 }
 
-OctNodeAABB::~OctNodeAABB()
-{
-	for (int i = 0; i < 8; ++i)
-	{
-		if (children_[i])
-			delete children_[i];
-	}
-}
-
 bool OctNodeAABB::intersect(IntersectionData* id, Ray r) const
 {
-	if (triangle_indices_.size() == 0)
+	if (triangle_indices_.empty())
+	{
 		// No triangles in this node
 		return false;
-	else if (children_[0] == NULL)
+	}
+	else if (children_[0] == nullptr)
 	{ // Reached a leaf node
 		float t_smallest = 10000000;
 		bool intersect = false;
@@ -241,14 +214,10 @@ bool OctNodeAABB::intersect(IntersectionData* id, Ray r) const
 
 OctTreeAABB::OctTreeAABB(Mesh* mesh) : 
 	OctNodeAABB(
-		NULL,
+		nullptr,
 		8, // Maximum depth of tree
 		mesh,
 		mesh->getMinPosition(),
 		mesh->getMaxPosition())
-{
-}
-
-OctTreeAABB::~OctTreeAABB()
 {
 }

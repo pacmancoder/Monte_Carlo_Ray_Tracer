@@ -2,6 +2,8 @@
 #define OCT_TREE_AABB
 
 #include <vector>
+#include <array>
+#include <memory>
 
 #include <glm/glm.hpp>
 #include "utils.h"
@@ -28,16 +30,16 @@ public:
 		Mesh* mesh,
 		glm::vec3 aabb_min,
 		glm::vec3 aabb_max);
-	~OctNodeAABB();
 
 	bool intersect(IntersectionData* id, Ray r) const;
 
 protected:
 	Mesh* mesh_;
 	AABB aabb_;
-	std::vector<unsigned int> triangle_indices_;
+	std::vector<size_t> triangle_indices_;
 
-	OctNodeAABB* children_[8]; // Child nodes
+	std::array<std::unique_ptr<OctNodeAABB>, 8> children_;
+
 	// In order:
 	// children_[0] = left bottom far
 	// children_[1] = right bottom far
@@ -53,8 +55,8 @@ protected:
 class OctTreeAABB : public OctNodeAABB
 {
 public:
-	OctTreeAABB(Mesh* mesh);
-	~OctTreeAABB();
+	explicit OctTreeAABB(Mesh* mesh);
+
 private:
 };
 

@@ -1,59 +1,35 @@
 #include "../include/Scene.h"
 
-#include "../external_libraries/common_include/pugixml.h"
-#include "../include/xmlTraverser.h"
-
-#include <iostream>
 #include <string>
 #include <random>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
+#include <glm/gtx/transform.hpp>
+
 // --- Scene class functions --- //
 
-Scene::Scene (const char* file_path)
-{
-	if (!file_path)
-	{
-		std::cout << "No scene file specified. Please use a scene xml file as argument" << std::endl;
-		exit (EXIT_FAILURE);
-	}
-
-	gen_ = new std::mt19937(rd_());
-	dis_ = new std::uniform_real_distribution<float>(0, 1);
-
-    pugi::xml_document doc;
-    std::cout << "Loading XML file." << std::endl;
-    pugi::xml_parse_result result = doc.load_file(file_path);
-    std::cout << "Result: " << result.description() << std::endl;
-
-    if (!result)
-		exit (EXIT_FAILURE);
-	
-	scene_traverser walker;
-	walker.scene = this;
-
-	std::cout << "Creating scene from XML file." << std::endl;
-	doc.traverse(walker);
-    std::cout << "Scene created!" << std::endl;
-}
+Scene::Scene() :
+    gen_(std::make_unique<std::mt19937>(std::random_device()())),
+    dis_(std::make_unique<std::uniform_real_distribution<float>>(0, 1)) {}
 
 Scene::~Scene()
 {
-	delete gen_;
-	delete dis_;
+    for (auto* object : objects_)
+    {
+        delete object;
+    }
 
-	for (int i = 0; i < objects_.size(); ++i)
-	{
-		delete objects_[i];
-	}
-	for (int i = 0; i < lamps_.size(); ++i)
-	{
-		delete lamps_[i];
-	}
-	for(std::map<std::string, Material* >::iterator it = materials_.begin();
-		it != materials_.end();
-		it++) {
-		delete it->second;
-	}
+    for (auto* lamp : lamps_)
+    {
+        delete lamp;
+    }
+
+    for (auto& materialPair : materials_)
+    {
+        delete materialPair.second;
+    }
 }
 
 bool Scene::intersect(IntersectionData* id, Ray r)
@@ -61,14 +37,14 @@ bool Scene::intersect(IntersectionData* id, Ray r)
 	IntersectionData id_smallest_t;
 	id_smallest_t.t = 100000; // Ugly solution
 
-	Object3D* intersecting_object = NULL;
-	for (int i = 0; i < objects_.size(); ++i)
+	Object3D* intersecting_object = nullptr;
+	for (auto& object : objects_)
 	{
 		IntersectionData id_local;
-		if (objects_[i]->intersect(&id_local,r) && id_local.t < id_smallest_t.t)
+		if (object->intersect(&id_local,r) && id_local.t < id_smallest_t.t)
 		{
 			id_smallest_t = id_local;
-			intersecting_object = objects_[i];
+			intersecting_object = object;
 		}
 	}
 	if (intersecting_object)
@@ -84,14 +60,14 @@ bool Scene::intersectLamp(LightSourceIntersectionData* light_id, Ray r)
 	LightSourceIntersectionData lamp_id_smallest_t;
 	lamp_id_smallest_t.t = 100000; // Ugly solution
 
-	LightSource* intersecting_lamp = NULL;
-	for (int i = 0; i < lamps_.size(); ++i)
+	LightSource* intersecting_lamp = nullptr;
+	for (auto& lamp : lamps_)
 	{
 		LightSourceIntersectionData id_local;
-		if (lamps_[i]->intersect(&id_local,r) && id_local.t < lamp_id_smallest_t.t)
+		if (lamp->intersect(&id_local,r) && id_local.t < lamp_id_smallest_t.t)
 		{
 			lamp_id_smallest_t = id_local;
-			intersecting_lamp = lamps_[i];
+			intersecting_lamp = lamp;
 		}
 	}
 	if (intersecting_lamp)
@@ -99,14 +75,14 @@ bool Scene::intersectLamp(LightSourceIntersectionData* light_id, Ray r)
 		IntersectionData id_smallest_t;
 		id_smallest_t.t = 100000; // Ugly solution
 
-		Object3D* intersecting_object = NULL;
-		for (int i = 0; i < objects_.size(); ++i)
+		const Object3D* intersecting_object = nullptr;
+		for (const auto& object : objects_)
 		{
 			IntersectionData id_local;
-			if (objects_[i]->intersect(&id_local,r) && id_local.t < id_smallest_t.t)
+			if (object->intersect(&id_local,r) && id_local.t < id_smallest_t.t)
 			{
 				id_smallest_t = id_local;
-				intersecting_object = objects_[i];
+				intersecting_object = object;
 			}
 		}
 		if (intersecting_object && id_smallest_t.t < lamp_id_smallest_t.t)
@@ -124,7 +100,7 @@ bool Scene::intersectLamp(LightSourceIntersectionData* light_id, Ray r)
 
 SpectralDistribution Scene::traceDiffuseRay(
 	Ray r,
-	int render_mode,
+	RenderMode render_mode,
 	IntersectionData id,
 	int iteration)
 {
@@ -139,20 +115,20 @@ SpectralDistribution Scene::traceDiffuseRay(
 
 SpectralDistribution Scene::traceLocalDiffuseRay(
 	Ray r,
-	int render_mode,
+	RenderMode /*render_mode*/,
 	IntersectionData id)
 {
 	SpectralDistribution L_local;
 	// Cast shadow rays
-	// We divide up the area light source in to n_samples area parts.
+	// We divide up_ the area light source in to n_samples area parts.
 	// Used to define the solid angle
 	static const int n_samples = 1;
-	for (int i = 0; i < lamps_.size(); ++i)
+	for (const auto& lamp : lamps_)
 	{
 		for (int j = 0; j < n_samples; ++j)
 		{
 			Ray shadow_ray = r;
-			glm::vec3 differance = lamps_[i]->getPointOnSurface((*dis_)(*gen_),(*dis_)(*gen_)) - shadow_ray.origin;
+			glm::vec3 differance = lamp->getPointOnSurface((*dis_)(*gen_),(*dis_)(*gen_)) - shadow_ray.origin;
 			shadow_ray.direction = glm::normalize(differance);
 
 			SpectralDistribution brdf;// = id.material.color_diffuse / (2 * M_PI); // Dependent on inclination and azimuth
@@ -195,7 +171,7 @@ SpectralDistribution Scene::traceLocalDiffuseRay(
 
 SpectralDistribution Scene::traceIndirectDiffuseRay(
 	Ray r,
-	int render_mode,
+	RenderMode render_mode,
 	IntersectionData id,
 	int iteration)
 {
@@ -205,7 +181,7 @@ SpectralDistribution Scene::traceIndirectDiffuseRay(
 	{
 		// helper is just a random vector and can not possibly be
 		// a zero vector since id.normal is normalized
-		glm::vec3 helper = id.normal + glm::vec3(1,1,1);
+		glm::vec3 helper = id.normal + glm::vec3(1, 1, 1);
 		glm::vec3 tangent = glm::normalize(glm::cross(id.normal, helper));
 
 		// rand1 is a random number from the cosine estimator
@@ -213,21 +189,16 @@ SpectralDistribution Scene::traceIndirectDiffuseRay(
 		float rand2 = (*dis_)(*gen_);
 
 		// Uniform distribution over a hemisphere
-		float inclination = acos(sqrt(rand1));//glm::acos(1 - rand1);//glm::acos(1 -  2 * (*dis_)(*gen_));
-		float azimuth = 2 * M_PI * rand2;
+		auto inclination = static_cast<float>(std::acos(std::sqrt(rand1)));//glm::acos(1 - rand1);//glm::acos(1 -  2 * (*dis_)(*gen_));
+		auto azimuth = static_cast<float>(2 * M_PI * rand2);
 		// Change the actual vector
-		glm::vec3 random_direction = id.normal;
-		random_direction = glm::normalize(glm::rotate(
-			random_direction,
-			inclination,
-			tangent));
-		random_direction = glm::normalize(glm::rotate(
-			random_direction,
-			azimuth,
-			id.normal));
+        glm::vec3 random_direction = glm::normalize(glm::vec3(
+                glm::rotate(inclination, tangent) * glm::vec4(id.normal, 0)));
+
+        random_direction = glm::normalize(glm::vec3(
+                glm::rotate(azimuth, id.normal) * glm::vec4(random_direction, 0)));
 
 		float cos_angle = glm::dot(random_direction, id.normal);
-		float g = cos_angle / M_PI;
 
 		SpectralDistribution brdf;
 		if (id.material.diffuse_roughness)
@@ -257,7 +228,7 @@ SpectralDistribution Scene::traceIndirectDiffuseRay(
 
 SpectralDistribution Scene::traceSpecularRay(
 	Ray r,
-	int render_mode,
+	RenderMode render_mode,
 	IntersectionData id,
 	int iteration)
 {
@@ -274,7 +245,7 @@ SpectralDistribution Scene::traceSpecularRay(
 
 SpectralDistribution Scene::traceRefractedRay(
 	Ray r,
-	int render_mode,
+	RenderMode render_mode,
 	IntersectionData id,
 	int iteration,
 	glm::vec3 offset,
@@ -294,8 +265,8 @@ SpectralDistribution Scene::traceRefractedRay(
 		// Schlicks approximation to Fresnels equations.
 		float n1 = r.material.refraction_index;
 		float n2 = id.material.refraction_index;
-		float R_0 = pow((n1 - n2)/(n1 + n2), 2);
-		float R = R_0 + (1 - R_0) * pow(1 - glm::dot(normal, -r.direction),5);
+		auto R_0 = static_cast<float>(std::pow((n1 - n2) / (n1 + n2), 2));
+		auto R = static_cast<float>(R_0 + (1 - R_0) * pow(1 - glm::dot(normal, -r.direction), 5));
 
 		Ray recursive_ray_reflected = recursive_ray;
 		Ray recursive_ray_refracted = recursive_ray;
@@ -343,7 +314,7 @@ SpectralDistribution Scene::traceRefractedRay(
 	}
 }
 
-SpectralDistribution Scene::traceRay(Ray r, int render_mode, int iteration)
+SpectralDistribution Scene::traceRay(Ray r, RenderMode render_mode, int iteration)
 {
 	IntersectionData id;
 	LightSourceIntersectionData lamp_id;
@@ -351,7 +322,7 @@ SpectralDistribution Scene::traceRay(Ray r, int render_mode, int iteration)
 	if (intersectLamp(&lamp_id, r)) // Ray hit light source
 		switch (render_mode)
 		{
-			case WHITTED_SPECULAR :
+			case RenderMode::WHITTED_SPECULAR :
 				return lamp_id.radiosity / (M_PI * 2);
 			default :
 				return SpectralDistribution();
@@ -361,7 +332,7 @@ SpectralDistribution Scene::traceRay(Ray r, int render_mode, int iteration)
 		// Russian roulette
 		float random = (*dis_)(*gen_);
 		//float non_termination_probability = glm::max((1 - float(iteration) / 10), 0.5f);
-		float non_termination_probability = iteration == 0 ? 1.0 : 0.8;
+		auto non_termination_probability = static_cast<float>(iteration == 0 ? 1.0 : 0.8);
 		if (random > non_termination_probability || iteration > 20)
 			return SpectralDistribution();
 		//if (iteration >= 4)
@@ -374,7 +345,6 @@ SpectralDistribution Scene::traceRay(Ray r, int render_mode, int iteration)
 			inside = true;
 		
 		float transmissivity = id.material.transmissivity;
-		float reflectance = id.material.reflectance;
 		float specularity = id.material.specular_reflectance;
 
 		SpectralDistribution total;
@@ -396,7 +366,7 @@ SpectralDistribution Scene::traceRay(Ray r, int render_mode, int iteration)
 			SpectralDistribution diffuse_part;
 			switch (render_mode)
 			{
-				case PHOTON_MAPPING :
+				case RenderMode::PHOTON_MAPPING:
 				{
 					if (r.has_intersected)
 					{
@@ -404,12 +374,12 @@ SpectralDistribution Scene::traceRay(Ray r, int render_mode, int iteration)
 						p.position = recursive_ray.origin;
 						p.direction_in = -r.direction;
 
-						float photon_area = Photon::RADIUS * Photon::RADIUS * M_PI;
+						auto photon_area = static_cast<float>(Photon::radius * Photon::radius * M_PI);
 						// The projected area should be photon area times cos theta,
 						// This is avoided both here and later to avoid numerical problem
 						// when dividing with small numbers.
 						float projected_area = photon_area;// * glm::dot(p.direction_in, id.normal);
-						float solid_angle = M_PI;
+						auto solid_angle = static_cast<float>(M_PI);
 			
 						p.delta_flux = recursive_ray.radiance / non_termination_probability * projected_area * solid_angle;
 
@@ -420,16 +390,16 @@ SpectralDistribution Scene::traceRay(Ray r, int render_mode, int iteration)
 					}
 					break;
 				}
-				case CAUSTICS :
+				case RenderMode::CAUSTICS:
 				{
 					KDTreeNode ref_node;
 					ref_node.p.position = r.origin + r.direction * id.t + offset;
 
 					std::vector<KDTreeNode> closest_photons;
-					photon_map_.find_within_range(ref_node,Photon::RADIUS,std::back_insert_iterator<std::vector<KDTreeNode> >(closest_photons));
+					photon_map_.find_within_range(ref_node,Photon::radius,std::back_insert_iterator<std::vector<KDTreeNode> >(closest_photons));
 					
 					SpectralDistribution photon_radiance;
-					for (int i = 0; i < closest_photons.size(); ++i)
+					for (size_t i = 0; i < closest_photons.size(); ++i)
 					{
 						SpectralDistribution brdf;
 						if (id.material.diffuse_roughness)
@@ -454,12 +424,12 @@ SpectralDistribution Scene::traceRay(Ray r, int render_mode, int iteration)
 						// The area of the photon if its inclination angle
 						// is 90 degrees and the surface is flat.
 						//float cos_theta = glm::max(glm::dot(closest_photons[i].p.direction_in, id.normal), 0.0f);
-						float photon_area = Photon::RADIUS * Photon::RADIUS * M_PI;
+						auto photon_area = static_cast<float>(Photon::radius * Photon::radius * M_PI);
 						float projected_area = photon_area;// * cos_theta;
 						photon_radiance +=
 							// flux / area / steradian = radiance
 							closest_photons[i].p.delta_flux *
-							(glm::length(distance) < Photon::RADIUS ? 1 : 0)
+							(glm::length(distance) < Photon::radius ? 1 : 0)
 							/ (projected_area * 2 * M_PI)
 							//
 							* brdf // The brdf is part of the integral of the rendering equation
@@ -469,12 +439,12 @@ SpectralDistribution Scene::traceRay(Ray r, int render_mode, int iteration)
 					diffuse_part = photon_radiance;
 					break;
 				}
-				case WHITTED_SPECULAR :
+				case RenderMode::WHITTED_SPECULAR:
 				{
 					diffuse_part = SpectralDistribution();
 					break;
 				}
-				case MONTE_CARLO :
+				case RenderMode::MONTE_CARLO:
 				{
 					diffuse_part =
 						(1 - specularity) ?
@@ -484,11 +454,6 @@ SpectralDistribution Scene::traceRay(Ray r, int render_mode, int iteration)
 								id,
 								iteration) :
 							SpectralDistribution();
-					break;
-				}
-				default :
-				{
-					diffuse_part = SpectralDistribution();
 					break;
 				}
 			}
@@ -508,16 +473,16 @@ SpectralDistribution Scene::traceRay(Ray r, int render_mode, int iteration)
 	return SpectralDistribution();
 }
 
-void Scene::buildPhotonMap(const int n_photons)
+void Scene::buildPhotonMap(int n_photons)
 {
-	if (lamps_.size())
+	if (!lamps_.empty())
 	{
 		SpectralDistribution total_flux = SpectralDistribution();
 		float total_flux_norm = 0;
-		for (int i = 0; i < lamps_.size(); ++i)
+		for (size_t i = 0; i < lamps_.size(); ++i)
 		{
-			total_flux_norm += lamps_[i]->radiosity.norm() * lamps_[i]->getArea();
-			total_flux += lamps_[i]->radiosity * lamps_[i]->getArea();
+			total_flux_norm += lamps_[i]->radiosity_.norm() * lamps_[i]->getArea();
+			total_flux += lamps_[i]->radiosity_ * lamps_[i]->getArea();
 		}
 		for (int k = 0; k < 100; ++k)
 		{
@@ -525,18 +490,18 @@ void Scene::buildPhotonMap(const int n_photons)
 			for (int i = 0; i < n_photons / 100; ++i)
 			{
 				// Pick a light source. Bigger flux => Bigger chance to be picked.
-				int picked_light_source = 0;
+				size_t picked_light_source = 0;
 				float accumulating_chance = 0;
 				float random = (*dis_)(*gen_);
-				for (int i = 0; i < lamps_.size(); ++i)
+				for (size_t j = 0; j < lamps_.size(); ++j)
 				{
 					float interval =
-						lamps_[i]->radiosity.norm() *
-						lamps_[i]->getArea() /
+						lamps_[j]->radiosity_.norm() *
+						lamps_[j]->getArea() /
 						total_flux_norm;
 					if (random > accumulating_chance && random < accumulating_chance + interval)
 					{ // This lamp got picked
-						picked_light_source = i;
+						picked_light_source = j;
 						break;
 					}
 					else
@@ -547,55 +512,17 @@ void Scene::buildPhotonMap(const int n_photons)
 				r.has_intersected = false;
 				// Compute delta_flux based on the flux of the light source
 				SpectralDistribution delta_flux = total_flux / n_photons;
-				float photon_area = Photon::RADIUS * Photon::RADIUS * M_PI;
-				float solid_angle = (M_PI * 2);
+				auto photon_area = static_cast<float>(Photon::radius * Photon::radius * M_PI);
+				auto solid_angle = static_cast<float>(M_PI * 2);
 				r.radiance = delta_flux / (photon_area * solid_angle);
-				traceRay(r, PHOTON_MAPPING);
+				traceRay(r, RenderMode::PHOTON_MAPPING);
 			}
-			std::cout << k << "\% of photon map finished." << std::endl;
 		}
-		std::cout << "Number of photons in scene: " << photon_map_.size() << std::endl;
-		std::cout << "Optimizing kd tree" << std::endl;
 		photon_map_.optimize();
 	}
-	else
-	{
-		std::cout << "No lightsource in the scene. Could not build photon map." << std::endl;
-	}
 }
 
-int Scene::getNumberOfTriangles()
-{
-	int n_triangles = 0;
-	for (int i = 0; i < objects_.size(); ++i)
-	{
-		if(Mesh* m = dynamic_cast<Mesh*>(objects_[i])) {
-		   // old was safely casted to NewType
-		   n_triangles += m->getNumberOfTriangles();
-		}
-	}
-	return  n_triangles;
-}
-
-int Scene::getNumberOfObjects()
-{
-	return objects_.size();
-}
-
-int Scene::getNumberOfSpheres()
-{
-	int n_spheres = 0;
-	for (int i = 0; i < objects_.size(); ++i)
-	{
-		if(Sphere* s = dynamic_cast<Sphere*>(objects_[i])) {
-		   // old was safely casted to NewType
-		   n_spheres ++;
-		}
-	}
-	return  n_spheres;
-}
-
-int Scene::getNumberOfPhotons()
+size_t Scene::getNumberOfPhotons()
 {
 	return photon_map_.size();
 }
