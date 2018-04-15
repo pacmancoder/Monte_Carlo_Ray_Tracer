@@ -198,8 +198,6 @@ SpectralDistribution Scene::traceIndirectDiffuseRay(
         random_direction = glm::normalize(glm::vec3(
                 glm::rotate(azimuth, id.normal) * glm::vec4(random_direction, 0)));
 
-		float cos_angle = glm::dot(random_direction, id.normal);
-
 		SpectralDistribution brdf;
 		if (id.material.diffuse_roughness)
 		{

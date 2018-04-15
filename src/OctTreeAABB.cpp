@@ -68,7 +68,7 @@ OctNodeAABB::OctNodeAABB(
 		parent->triangle_indices_;
 	
 	// Check parents triangles and see which of them is in this node
-	for (int i = 0; i < index_list.size(); i=i+3)
+	for (size_t i = 0; i < index_list.size(); i=i+3)
 	{
 		if (aabb_.intersectTriangle(
 			mesh->positions_[index_list[i + 0]],
@@ -85,7 +85,7 @@ OctNodeAABB::OctNodeAABB(
 	{ // Continue recursion, create more children
 		glm::vec3 child_aabb_min;
 		glm::vec3 child_aabb_max;
-		for (int i = 0; i < 8; ++i)
+		for (size_t i = 0; i < 8; ++i)
 		{
 			child_aabb_min = glm::vec3(
 				i%2 	== 0 ? aabb_min.x : (aabb_min.x + aabb_max.x) / 2,
@@ -127,7 +127,7 @@ bool OctNodeAABB::intersect(IntersectionData* id, Ray r) const
 		float t;
 
 		// Check intersection for all triangles in this node
-		for (int i = 0; i < triangle_indices_.size(); i=i+3)
+		for (size_t i = 0; i < triangle_indices_.size(); i=i+3)
 		{
 			// Möller–Trumbore intersection algorithm for triangle
 

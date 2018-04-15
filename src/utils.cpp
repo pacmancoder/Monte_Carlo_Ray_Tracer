@@ -160,9 +160,9 @@ Material Material::air()
 }
 
 SpectralDistribution evaluateLambertianBRDF(
-	glm::vec3 d1,
-	glm::vec3 d2,
-	glm::vec3 normal,
+	glm::vec3 /*d1*/,
+	glm::vec3 /*d2*/,
+	glm::vec3 /*normal*/,
 	SpectralDistribution albedo)
 {
 	return albedo / M_PI;
