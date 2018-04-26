@@ -8,15 +8,15 @@
 
 #include <glm/glm.hpp>
 
-#include "utils.h"
-#include "Object3D.h"
+#include <mcrt/utils.h>
+#include <mcrt/Object3D.h>
+#include <mcrt/Camera.h>
 #include <external/kdtree++/kdtree.hpp>
 
 class Scene
 {
 public:
 	Scene();
-	~Scene();
 	
 	enum class RenderMode
     {
@@ -25,9 +25,26 @@ public:
         WHITTED_SPECULAR,
         MONTE_CARLO,
 	};
-	
+
+	using SceneEntityId = uint32_t;
+	using ObjectPtr = std::shared_ptr<Object3D>;
+	using LightSourcePtr = std::shared_ptr<LightSource>;
+	using MaterialPtr = std::shared_ptr<Material>;
+	using CameraPtr = std::shared_ptr<Camera>;
+
+public:
+	void AddObject(SceneEntityId id, const ObjectPtr& object);
+	void AddLightSource(SceneEntityId id, const LightSourcePtr& lightSource);
+	void AddMaterial(SceneEntityId id, const MaterialPtr& material);
+	void AddCamera(SceneEntityId id, const CameraPtr& camera);
+
+	const Camera& GetDefaultCamera() const;
+
+public: // Tracing
 	SpectralDistribution traceRay(Ray r, RenderMode render_mode, int iteration = 0);
 
+
+public: // Photon map
 	void buildPhotonMap(int n_photons);
     size_t getNumberOfPhotons();
 
@@ -69,9 +86,11 @@ private:
 	std::unique_ptr<std::mt19937> gen_;
 	std::unique_ptr<std::uniform_real_distribution<float>> dis_;
 
-	std::vector<Object3D*> objects_;
-	std::vector<LightSource*> lamps_;
-	std::map<std::string, Material*> materials_;
+	std::map<SceneEntityId, CameraPtr> cameras_;
+	std::map<SceneEntityId, ObjectPtr> objects_;
+	std::map<SceneEntityId, LightSourcePtr> lightSources_;
+	std::map<SceneEntityId, MaterialPtr> materials_;
 
 	KDTree::KDTree<3, KDTreeNode> photon_map_;
+	bool photonMapBuilt_;
 };

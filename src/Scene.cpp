@@ -12,25 +12,12 @@
 
 Scene::Scene() :
     gen_(std::make_unique<std::mt19937>(std::random_device()())),
-    dis_(std::make_unique<std::uniform_real_distribution<float>>(0, 1)) {}
-
-Scene::~Scene()
-{
-    for (auto* object : objects_)
-    {
-        delete object;
-    }
-
-    for (auto* lamp : lamps_)
-    {
-        delete lamp;
-    }
-
-    for (auto& materialPair : materials_)
-    {
-        delete materialPair.second;
-    }
-}
+    dis_(std::make_unique<std::uniform_real_distribution<float>>(0, 1)),
+	cameras_(),
+	objects_(),
+	lightSources_(),
+	materials_(),
+	photonMapBuilt_(false) {}
 
 bool Scene::intersect(IntersectionData* id, Ray r)
 {
@@ -38,20 +25,23 @@ bool Scene::intersect(IntersectionData* id, Ray r)
 	id_smallest_t.t = 100000; // Ugly solution
 
 	Object3D* intersecting_object = nullptr;
+
 	for (auto& object : objects_)
 	{
 		IntersectionData id_local;
-		if (object->intersect(&id_local,r) && id_local.t < id_smallest_t.t)
+		if (object.second->intersect(&id_local,r) && id_local.t < id_smallest_t.t)
 		{
 			id_smallest_t = id_local;
-			intersecting_object = object;
+			intersecting_object = object.second.get();
 		}
 	}
+
 	if (intersecting_object)
 	{
 		*id = id_smallest_t;
 		return true;
 	}
+
 	return false;
 }
 
@@ -61,13 +51,13 @@ bool Scene::intersectLamp(LightSourceIntersectionData* light_id, Ray r)
 	lamp_id_smallest_t.t = 100000; // Ugly solution
 
 	LightSource* intersecting_lamp = nullptr;
-	for (auto& lamp : lamps_)
+	for (const auto& lightSource : lightSources_)
 	{
 		LightSourceIntersectionData id_local;
-		if (lamp->intersect(&id_local,r) && id_local.t < lamp_id_smallest_t.t)
+		if (lightSource.second->intersect(&id_local,r) && id_local.t < lamp_id_smallest_t.t)
 		{
 			lamp_id_smallest_t = id_local;
-			intersecting_lamp = lamp;
+			intersecting_lamp = lightSource.second.get();
 		}
 	}
 	if (intersecting_lamp)
@@ -79,10 +69,10 @@ bool Scene::intersectLamp(LightSourceIntersectionData* light_id, Ray r)
 		for (const auto& object : objects_)
 		{
 			IntersectionData id_local;
-			if (object->intersect(&id_local,r) && id_local.t < id_smallest_t.t)
+			if (object.second->intersect(&id_local,r) && id_local.t < id_smallest_t.t)
 			{
 				id_smallest_t = id_local;
-				intersecting_object = object;
+				intersecting_object = object.second.get();
 			}
 		}
 		if (intersecting_object && id_smallest_t.t < lamp_id_smallest_t.t)
@@ -123,12 +113,12 @@ SpectralDistribution Scene::traceLocalDiffuseRay(
 	// We divide up_ the area light source in to n_samples area parts.
 	// Used to define the solid angle
 	static const int n_samples = 1;
-	for (const auto& lamp : lamps_)
+	for (const auto& lightSource : lightSources_)
 	{
 		for (int j = 0; j < n_samples; ++j)
 		{
 			Ray shadow_ray = r;
-			glm::vec3 differance = lamp->getPointOnSurface((*dis_)(*gen_),(*dis_)(*gen_)) - shadow_ray.origin;
+			glm::vec3 differance = lightSource.second->getPointOnSurface((*dis_)(*gen_),(*dis_)(*gen_)) - shadow_ray.origin;
 			shadow_ray.direction = glm::normalize(differance);
 
 			SpectralDistribution brdf;// = id.material.color_diffuse / (2 * M_PI); // Dependent on inclination and azimuth
@@ -473,51 +463,62 @@ SpectralDistribution Scene::traceRay(Ray r, RenderMode render_mode, int iteratio
 
 void Scene::buildPhotonMap(int n_photons)
 {
-	if (!lamps_.empty())
-	{
-		SpectralDistribution total_flux = SpectralDistribution();
-		float total_flux_norm = 0;
-		for (size_t i = 0; i < lamps_.size(); ++i)
-		{
-			total_flux_norm += lamps_[i]->radiosity_.norm() * lamps_[i]->getArea();
-			total_flux += lamps_[i]->radiosity_ * lamps_[i]->getArea();
-		}
-		for (int k = 0; k < 100; ++k)
-		{
-			#pragma omp parallel for
-			for (int i = 0; i < n_photons / 100; ++i)
-			{
-				// Pick a light source. Bigger flux => Bigger chance to be picked.
-				size_t picked_light_source = 0;
-				float accumulating_chance = 0;
-				float random = (*dis_)(*gen_);
-				for (size_t j = 0; j < lamps_.size(); ++j)
-				{
-					float interval =
-						lamps_[j]->radiosity_.norm() *
-						lamps_[j]->getArea() /
-						total_flux_norm;
-					if (random > accumulating_chance && random < accumulating_chance + interval)
-					{ // This lamp got picked
-						picked_light_source = j;
-						break;
-					}
-					else
-						accumulating_chance += interval; 
-				}
 
-				Ray r = lamps_[picked_light_source]->shootLightRay();
-				r.has_intersected = false;
-				// Compute delta_flux based on the flux of the light source
-				SpectralDistribution delta_flux = total_flux / n_photons;
-				auto photon_area = static_cast<float>(Photon::radius * Photon::radius * M_PI);
-				auto solid_angle = static_cast<float>(M_PI * 2);
-				r.radiance = delta_flux / (photon_area * solid_angle);
-				traceRay(r, RenderMode::PHOTON_MAPPING);
-			}
-		}
-		photon_map_.optimize();
+	if (photonMapBuilt_ || lightSources_.empty())
+	{
+		return;
 	}
+
+	SpectralDistribution total_flux = SpectralDistribution();
+	float total_flux_norm = 0;
+	for (const auto& lightSource : lightSources_)
+	{
+		total_flux_norm += lightSource.second->radiosity_.norm() * lightSource.second->getArea();
+		total_flux += lightSource.second->radiosity_ * lightSource.second->getArea();
+	}
+	for (int k = 0; k < 100; ++k)
+	{
+		#pragma omp parallel for
+		for (int i = 0; i < n_photons / 100; ++i)
+		{
+			// Pick a light source. Bigger flux => Bigger chance to be picked.
+			float accumulating_chance = 0;
+			float random = (*dis_)(*gen_);
+
+			auto picked_light_source = lightSources_.cbegin();
+
+			for (auto lightSource = lightSources_.cbegin(); lightSource != lightSources_.cend(); ++lightSource)
+			{
+				float interval =
+						lightSource->second->radiosity_.norm() *
+						lightSource->second->getArea() /
+						total_flux_norm;
+				if (random > accumulating_chance && random < accumulating_chance + interval)
+				{
+					// This lamp got picked
+					picked_light_source = lightSource;
+					break;
+				}
+				else
+				{
+					accumulating_chance += interval;
+				}
+			}
+
+			Ray r = picked_light_source->second->shootLightRay();
+
+			r.has_intersected = false;
+			// Compute delta_flux based on the flux of the light source
+			SpectralDistribution delta_flux = total_flux / n_photons;
+			auto photon_area = static_cast<float>(Photon::radius * Photon::radius * M_PI);
+			auto solid_angle = static_cast<float>(M_PI * 2);
+			r.radiance = delta_flux / (photon_area * solid_angle);
+			traceRay(r, RenderMode::PHOTON_MAPPING);
+		}
+	}
+	photon_map_.optimize();
+
+	photonMapBuilt_ = true;
 }
 
 size_t Scene::getNumberOfPhotons()
@@ -525,3 +526,27 @@ size_t Scene::getNumberOfPhotons()
 	return photon_map_.size();
 }
 
+void Scene::AddCamera(Scene::SceneEntityId id, const Scene::CameraPtr& camera)
+{
+    cameras_.emplace(id, camera);
+}
+
+void Scene::AddObject(Scene::SceneEntityId id, const Scene::ObjectPtr& object)
+{
+    objects_.emplace(id, object);
+}
+
+void Scene::AddLightSource(Scene::SceneEntityId id, const Scene::LightSourcePtr& lightSource)
+{
+    lightSources_.emplace(id, lightSource);
+}
+
+void Scene::AddMaterial(Scene::SceneEntityId id, const Scene::MaterialPtr& material)
+{
+    materials_.emplace(id, material);
+}
+
+const Camera& Scene::GetDefaultCamera() const
+{
+    return *cameras_.cbegin()->second;
+}

@@ -31,6 +31,6 @@ file(GLOB INTERNAL_HEADERS
         libs/include/external/kdtree++/*.hpp)
 
 # Create the executable from our sources
-add_executable(${PROJECT_NAME} ${INTERNAL_SOURCE} ${INTERNAL_HEADERS})
+add_library(${PROJECT_NAME} STATIC ${INTERNAL_SOURCE} ${INTERNAL_HEADERS})
 
 target_link_libraries(${PROJECT_NAME} PUBLIC glm)
