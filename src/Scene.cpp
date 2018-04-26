@@ -1,4 +1,4 @@
-#include "../include/Scene.h"
+#include <mcrt/Scene.h>
 
 #include <string>
 #include <random>

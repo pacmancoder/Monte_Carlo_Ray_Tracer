@@ -1,4 +1,4 @@
-#include "../include/Camera.h"
+#include <mcrt/Camera.h>
 
 Camera::Camera (
 	glm::vec3 eye,

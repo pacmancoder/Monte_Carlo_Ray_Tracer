@@ -1,7 +1,7 @@
-#include "../include/OctTreeAABB.h"
-#include "../include/Object3D.h"
+#include "mcrt/OctTreeAABB.h"
+#include "mcrt/Object3D.h"
 
-#include "../external_libraries/common_include/boxOverlap.h"
+#include <external/boxOverlap.h>
 
 #include <iostream>
 

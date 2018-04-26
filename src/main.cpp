@@ -7,8 +7,8 @@
 #include <glm/glm.hpp>
 #include <omp.h>
 
-#include "../include/Camera.h"
-#include "../include/Scene.h"
+#include <mcrt/Camera.h>
+#include <mcrt/Scene.h>
 
 int main()
 {

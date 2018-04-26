@@ -2,7 +2,7 @@
 #include <string>
 #include <iostream>
 
-#include "../include/utils.h"
+#include <mcrt/utils.h>
 
 const float Photon::radius = 0.1;
 

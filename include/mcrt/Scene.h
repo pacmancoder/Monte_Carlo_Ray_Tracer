@@ -10,7 +10,7 @@
 
 #include "utils.h"
 #include "Object3D.h"
-#include "../external_libraries/common_include/kdtree++/kdtree.hpp"
+#include <external/kdtree++/kdtree.hpp>
 
 class Scene
 {

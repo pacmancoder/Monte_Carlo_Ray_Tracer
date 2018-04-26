@@ -1,6 +1,6 @@
-#include "../include/Object3D.h"
+#include "mcrt/Object3D.h"
 
-#include "../external_libraries/common_include/vboindexer.h"
+#include <external/vboindexer.h>
 
 #include <cmath>
 #include <random>

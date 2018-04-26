@@ -16,17 +16,19 @@ endif()
 
 include_directories(${OPENMP_INCLUDE_DIR})
 
-# Our own include directory
-set(COMMON_INCLUDES ${PROJECT_SOURCE_DIR}/include)
-include_directories(${COMMON_INCLUDES})
+
+include_directories(libs/include)
+include_directories(include)
 
 # Source files
 file(GLOB INTERNAL_SOURCE
-        ${PROJECT_SOURCE_DIR}/src/*.cpp
-        ${PROJECT_SOURCE_DIR}/external_libraries/common_src/*.cpp)
+        src/*.cpp
+        libs/src/*.cpp)
+
 file(GLOB INTERNAL_HEADERS
-        ${PROJECT_SOURCE_DIR}/include/*.h
-        ${PROJECT_SOURCE_DIR}/external_libraries/common_include/*.h)
+        include/mcrt/*.h
+        libs/include/external/*.h
+        libs/include/external/kdtree++/*.hpp)
 
 # Create the executable from our sources
 add_executable(${PROJECT_NAME} ${INTERNAL_SOURCE} ${INTERNAL_HEADERS})
