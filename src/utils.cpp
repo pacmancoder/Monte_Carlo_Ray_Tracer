@@ -1,8 +1,10 @@
+#include <mcrt/utils.h>
+
 #include <cmath>
 #include <string>
 #include <iostream>
 
-#include <mcrt/utils.h>
+using namespace Mcrt;
 
 const float Photon::radius = 0.1;
 
@@ -159,7 +161,7 @@ Material Material::air()
 	return air;
 }
 
-SpectralDistribution evaluateLambertianBRDF(
+SpectralDistribution Mcrt::evaluateLambertianBRDF(
 	glm::vec3 /*d1*/,
 	glm::vec3 /*d2*/,
 	glm::vec3 /*normal*/,
@@ -168,13 +170,13 @@ SpectralDistribution evaluateLambertianBRDF(
 	return albedo / M_PI;
 }
 
-SpectralDistribution evaluatePerfectBRDF(
+SpectralDistribution Mcrt::evaluatePerfectBRDF(
 	SpectralDistribution albedo)
 {
 	return albedo;
 }
 
-SpectralDistribution evaluateOrenNayarBRDF(
+SpectralDistribution Mcrt::evaluateOrenNayarBRDF(
 	glm::vec3 d1,
 	glm::vec3 d2,
 	glm::vec3 normal,

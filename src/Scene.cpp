@@ -8,6 +8,8 @@
 #include <glm/ext.hpp>
 #include <glm/gtx/transform.hpp>
 
+using namespace Mcrt;
+
 // --- Scene class functions --- //
 
 Scene::Scene() :

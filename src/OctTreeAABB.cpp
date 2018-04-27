@@ -1,9 +1,12 @@
-#include "mcrt/OctTreeAABB.h"
-#include "mcrt/Object3D.h"
+#include <mcrt/Object3D.h>
+
+#include <mcrt/OctTreeAABB.h>
 
 #include <external/boxOverlap.h>
 
 #include <iostream>
+
+using namespace Mcrt;
 
 // --- AABB class functions --- //
 

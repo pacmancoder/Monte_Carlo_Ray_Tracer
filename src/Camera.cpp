@@ -1,5 +1,7 @@
 #include <mcrt/Camera.h>
 
+using namespace Mcrt;
+
 Camera::Camera (
 	glm::vec3 eye,
 	glm::vec3 center,

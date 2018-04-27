@@ -11,6 +11,8 @@
 #include <glm/ext.hpp>
 #include <glm/gtx/transform.hpp>
 
+using namespace Mcrt;
+
 // --- Object3D class functions --- //
 
 Object3D::Object3D(Material* material) : 

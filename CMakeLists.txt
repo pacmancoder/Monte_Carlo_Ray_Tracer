@@ -34,3 +34,6 @@ file(GLOB INTERNAL_HEADERS
 add_library(${PROJECT_NAME} STATIC ${INTERNAL_SOURCE} ${INTERNAL_HEADERS})
 
 target_link_libraries(${PROJECT_NAME} PUBLIC glm)
+
+target_include_directories(${PROJECT_NAME} PUBLIC libs/include)
+target_include_directories(${PROJECT_NAME} PUBLIC include)
