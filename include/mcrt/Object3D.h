@@ -99,7 +99,6 @@ namespace Mcrt
 		bool intersect(LightSourceIntersectionData *light_id, Ray r);
 		glm::vec3 getPointOnSurface(float u, float v) const;
 		float getArea() const;
-		glm::vec3 getNormal() const;
 
 		Ray shootLightRay();
 

@@ -271,11 +271,6 @@ float LightSource::getArea() const
 	return emitter_.getArea();
 }
 
-glm::vec3 LightSource::getNormal() const
-{
-	return emitter_.getNormal();
-}
-
 Ray LightSource::shootLightRay()
 {
 	// Move random code out later
