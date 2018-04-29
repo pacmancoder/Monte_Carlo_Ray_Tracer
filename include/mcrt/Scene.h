@@ -18,7 +18,7 @@ namespace Mcrt
 	class Scene
 	{
 	public:
-		Scene();
+		Scene(uint16_t frameWidth, uint16_t frameHeight);
 
 		enum class RenderMode
 		{
@@ -84,7 +84,14 @@ namespace Mcrt
 		bool intersect(IntersectionData *id, Ray r);
 		bool intersectLamp(LightSourceIntersectionData *light_id, Ray r);
 
+	public:
+		uint16_t get_frame_width() const;
+		uint16_t get_frame_height() const;
+
 	private:
+		uint16_t frameWidth_;
+		uint16_t frameHeight_;
+
 		std::unique_ptr<std::mt19937> gen_;
 		std::unique_ptr<std::uniform_real_distribution<float>> dis_;
 

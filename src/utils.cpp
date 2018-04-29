@@ -8,6 +8,9 @@ using namespace Mcrt;
 
 const float Photon::radius = 0.1;
 
+SpectralDistribution::SpectralDistribution(float r, float g, float b) :
+    data{r, g, b} {}
+
 SpectralDistribution::SpectralDistribution() :
     data{0, 0, 0} {}
 
@@ -64,7 +67,7 @@ SpectralDistribution SpectralDistribution::operator-(const SpectralDistribution&
 	return to_return;
 }
 
-SpectralDistribution SpectralDistribution::operator^(const float& f) const
+SpectralDistribution SpectralDistribution::operator^(float f) const
 {
 	SpectralDistribution to_return;
 	for (int i = 0; i < N_WAVELENGTHS; ++i)
@@ -74,7 +77,7 @@ SpectralDistribution SpectralDistribution::operator^(const float& f) const
 	return to_return;
 }
 
-SpectralDistribution SpectralDistribution::operator/(const float& f) const
+SpectralDistribution SpectralDistribution::operator/(float f) const
 {
 	SpectralDistribution to_return;
 	for (int i = 0; i < N_WAVELENGTHS; ++i)
@@ -84,7 +87,7 @@ SpectralDistribution SpectralDistribution::operator/(const float& f) const
 	return to_return;
 }
 
-SpectralDistribution SpectralDistribution::operator*(const float& f) const
+SpectralDistribution SpectralDistribution::operator*(float f) const
 {
 	SpectralDistribution to_return;
 	for (int i = 0; i < N_WAVELENGTHS; ++i)
@@ -133,7 +136,7 @@ SpectralDistribution SpectralDistribution::operator*=(const SpectralDistribution
 }
 
 
-SpectralDistribution SpectralDistribution::operator/=(const float& f)
+SpectralDistribution SpectralDistribution::operator/=(float f)
 {
 	for (auto& wave : data)
 	{
@@ -143,7 +146,7 @@ SpectralDistribution SpectralDistribution::operator/=(const float& f)
 	return *this;
 }
 
-SpectralDistribution SpectralDistribution::operator*=(const float& f)
+SpectralDistribution SpectralDistribution::operator*=(float f)
 {
 	for (auto& wave : data)
 	{
@@ -155,7 +158,7 @@ SpectralDistribution SpectralDistribution::operator*=(const float& f)
 
 Material Material::air()
 {
-	Material air;
+	Material air {};
 	air.transmissivity = 1;
 	air.refraction_index = 1;
 	return air;

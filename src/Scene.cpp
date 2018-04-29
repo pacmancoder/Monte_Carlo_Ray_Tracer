@@ -12,7 +12,9 @@ using namespace Mcrt;
 
 // --- Scene class functions --- //
 
-Scene::Scene() :
+Scene::Scene(uint16_t frameWidth, uint16_t frameHeight) :
+    frameWidth_(frameWidth),
+    frameHeight_(frameHeight),
     gen_(std::make_unique<std::mt19937>(std::random_device()())),
     dis_(std::make_unique<std::uniform_real_distribution<float>>(0, 1)),
 	cameras_(),
@@ -49,13 +51,13 @@ bool Scene::intersect(IntersectionData* id, Ray r)
 
 bool Scene::intersectLamp(LightSourceIntersectionData* light_id, Ray r)
 {
-	LightSourceIntersectionData lamp_id_smallest_t;
+	LightSourceIntersectionData lamp_id_smallest_t = {};
 	lamp_id_smallest_t.t = 100000; // Ugly solution
 
 	LightSource* intersecting_lamp = nullptr;
 	for (const auto& lightSource : lightSources_)
 	{
-		LightSourceIntersectionData id_local;
+		LightSourceIntersectionData id_local  = {};
 		if (lightSource.second->intersect(&id_local,r) && id_local.t < lamp_id_smallest_t.t)
 		{
 			lamp_id_smallest_t = id_local;
@@ -210,7 +212,7 @@ SpectralDistribution Scene::traceIndirectDiffuseRay(
 		}
 
 		r.direction = random_direction;
-		r.radiance *= M_PI * brdf; // Importance, M_PI is because of the importance sampling
+		r.radiance *= brdf * M_PI; // Importance, M_PI is because of the importance sampling
 		L_indirect += traceRay(r, render_mode, iteration + 1) * M_PI * brdf;
 	}
 	return L_indirect / n_samples;
@@ -480,7 +482,7 @@ void Scene::buildPhotonMap(int n_photons)
 	}
 	for (int k = 0; k < 100; ++k)
 	{
-		#pragma omp parallel for
+		//#pragma omp parallel for
 		for (int i = 0; i < n_photons / 100; ++i)
 		{
 			// Pick a light source. Bigger flux => Bigger chance to be picked.
@@ -530,25 +532,35 @@ size_t Scene::getNumberOfPhotons()
 
 void Scene::AddCamera(Scene::SceneEntityId id, const Scene::CameraPtr& camera)
 {
-    cameras_.emplace(id, camera);
+    cameras_[id] = camera;
 }
 
 void Scene::AddObject(Scene::SceneEntityId id, const Scene::ObjectPtr& object)
 {
-    objects_.emplace(id, object);
+    objects_[id] = object;
 }
 
 void Scene::AddLightSource(Scene::SceneEntityId id, const Scene::LightSourcePtr& lightSource)
 {
-    lightSources_.emplace(id, lightSource);
+    lightSources_[id] = lightSource;
 }
 
 void Scene::AddMaterial(Scene::SceneEntityId id, const Scene::MaterialPtr& material)
 {
-    materials_.emplace(id, material);
+    materials_[id] = material;
 }
 
 const Camera& Scene::GetDefaultCamera() const
 {
     return *cameras_.cbegin()->second;
+}
+
+uint16_t Scene::get_frame_width() const
+{
+	return frameWidth_;
+}
+
+uint16_t Scene::get_frame_height() const
+{
+	return frameHeight_;
 }

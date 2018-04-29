@@ -1,4 +1,4 @@
-#include "mcrt/Object3D.h"
+#include <mcrt/Object3D.h>
 
 #include <external/vboindexer.h>
 
@@ -15,7 +15,7 @@ using namespace Mcrt;
 
 // --- Object3D class functions --- //
 
-Object3D::Object3D(Material* material) : 
+Object3D::Object3D(const MaterialPtr& material) :
 	material_(material) {}
 
 Material Object3D::material() const
@@ -25,7 +25,7 @@ Material Object3D::material() const
 
 // --- Mesh class functions --- //
 Mesh::Mesh(
-		Material * material,
+		const MaterialPtr& material,
 		glm::mat4 transform,
 		std::vector<glm::vec3>&& positions,
 		std::vector<glm::vec3>&& normals,
@@ -101,7 +101,7 @@ size_t Mesh::getNumberOfTriangles() const
 
 // --- Sphere class functions --- //
 
-Sphere::Sphere(Material* material, glm::vec3 position, float radius) :
+Sphere::Sphere(const MaterialPtr& material, glm::vec3 position, float radius) :
 	Object3D(material),
 	position_(position),
 	radius_(radius) {}
@@ -160,7 +160,7 @@ glm::vec3 Sphere::getPointOnSurface(float u, float v) const
 
 // --- Plane class functions --- //
 
-Plane::Plane(Material* material, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) :
+Plane::Plane(const MaterialPtr& material, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) :
 	Object3D(material),
 	p0_(p0),
 	p1_(p1),
@@ -243,7 +243,7 @@ LightSource::LightSource(
 	float flux,
 	SpectralDistribution color) :
 	emitter_(nullptr, p0, p1, p2),
-	radiosity_(flux / emitter_.getArea() * color)
+	radiosity_(color * (flux / emitter_.getArea()))
 {}
 
 bool LightSource::intersect(LightSourceIntersectionData* light_id, Ray r)

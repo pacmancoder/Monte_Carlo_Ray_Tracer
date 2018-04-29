@@ -22,8 +22,8 @@ include_directories(include)
 
 # Source files
 file(GLOB INTERNAL_SOURCE
-        src/*.cpp
-        libs/src/*.cpp)
+		libs/src/*.cpp
+		src/*.cpp)
 
 file(GLOB INTERNAL_HEADERS
         include/mcrt/*.h

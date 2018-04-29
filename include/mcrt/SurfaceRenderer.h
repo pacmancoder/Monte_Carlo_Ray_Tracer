@@ -24,6 +24,6 @@ namespace Mcrt
     {
     public:
         std::vector<SpectralDistribution> RenderChunk(
-                Scene& scene, FrameInfo& frameInfo, ChunkInfo& chunkInfo) const;
+                Scene& scene, const FrameInfo& frameInfo, const ChunkInfo& chunkInfo) const;
     };
 }

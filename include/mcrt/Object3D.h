@@ -1,7 +1,7 @@
 #pragma once
 
-#include "OctTreeAABB.h"
-#include "utils.h"
+#include <mcrt/OctTreeAABB.h>
+#include <mcrt/utils.h>
 
 #include <vector>
 #include <array>
@@ -14,25 +14,27 @@ namespace Mcrt
 	class Object3D
 	{
 	public:
-		explicit Object3D(Material *material);
+		using MaterialPtr = std::shared_ptr<Material>;
+
+	public:
+		explicit Object3D(const MaterialPtr& material);
 		virtual ~Object3D() = default;
 
 		virtual bool intersect(IntersectionData *id, Ray r) const = 0;
 		Material material() const;
 
 	private:
-		const Material *material_;
+		const MaterialPtr material_;
 	};
 
 	class Mesh : public Object3D
 	{
 	public:
-		Mesh(
-				Material *material,
-				glm::mat4 transform,
-				std::vector<glm::vec3> &&positions,
-				std::vector<glm::vec3> &&normals,
-				std::vector<glm::vec2> &&uvs);
+		Mesh(const MaterialPtr& material,
+			 glm::mat4 transform,
+			 std::vector<glm::vec3> &&positions,
+			 std::vector<glm::vec3> &&normals,
+			 std::vector<glm::vec2> &&uvs);
 
 		bool intersect(IntersectionData *id, Ray r) const override;
 
@@ -56,7 +58,9 @@ namespace Mcrt
 	class Sphere : public Object3D
 	{
 	public:
-		Sphere(Material *material, glm::vec3 position, float radius);
+		Sphere(const MaterialPtr& material,
+			   glm::vec3 position,
+			   float radius);
 
 		bool intersect(IntersectionData *id, Ray r) const override;
 		glm::vec3 getPointOnSurface(float u, float v) const;
@@ -70,7 +74,8 @@ namespace Mcrt
 	class Plane : public Object3D
 	{
 	public:
-		Plane(Material *material, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2);
+		Plane(const MaterialPtr& material,
+			  glm::vec3 p0, glm::vec3 p1, glm::vec3 p2);
 
 		bool intersect(IntersectionData *id, Ray r) const override;
 
@@ -87,7 +92,8 @@ namespace Mcrt
 	class LightSource
 	{
 	private:
-		const Plane emitter_;
+		Plane emitter_;
+
 	public:
 		LightSource(
 				glm::vec3 p0,

@@ -7,10 +7,10 @@
 
 namespace Mcrt
 {
-
 	class SpectralDistribution
 	{
 	public:
+		SpectralDistribution(float r, float g, float b);
 		SpectralDistribution();
 
 		float norm() const;
@@ -22,18 +22,20 @@ namespace Mcrt
 		friend SpectralDistribution operator*(
 				float f,
 				const SpectralDistribution &sd);
+
 		float &operator[](int i);
 		SpectralDistribution operator+(const SpectralDistribution &sd) const;
 		SpectralDistribution operator-(const SpectralDistribution &sd) const;
-		SpectralDistribution operator^(const float &f) const;
-		SpectralDistribution operator/(const float &f) const;
-		SpectralDistribution operator*(const float &f) const;
-		SpectralDistribution operator*(const SpectralDistribution &sd) const;
+        SpectralDistribution operator*(const SpectralDistribution &sd) const;
+        SpectralDistribution operator^(float f) const;
+        SpectralDistribution operator/(float f) const;
+        SpectralDistribution operator*(float f) const;
+
 		SpectralDistribution operator+=(const SpectralDistribution &sd);
 		SpectralDistribution operator-=(const SpectralDistribution &sd);
 		SpectralDistribution operator*=(const SpectralDistribution &sd);
-		SpectralDistribution operator/=(const float &f);
-		SpectralDistribution operator*=(const float &f);
+		SpectralDistribution operator/=(float f);
+		SpectralDistribution operator*=(float f);
 
 		// Currently not used as wavelengths. We only care about three channels,
 		// (hence three wavelengths) r, g, b. These would not correspond to real
@@ -56,6 +58,7 @@ namespace Mcrt
 		float transmissivity; // [0 , 1]
 		float refraction_index; // [1 (air) , 2.4 (diamond)]
 		float diffuse_roughness; // [0 , inf) 0 : Lambertian reflector
+        float emittance;
 
 		static Material air();
 	};

@@ -15,7 +15,7 @@
 using namespace Mcrt;
 
 std::vector<SpectralDistribution> SurfaceRenderer::RenderChunk(
-        Scene& scene, FrameInfo& frameInfo, ChunkInfo& chunkInfo) const
+        Scene& scene, const FrameInfo& frameInfo, const ChunkInfo& chunkInfo) const
 {
 	static const int SUB_SAMPLING_CAUSTICS = 10;
 	static const int SUB_SAMPLING_MONTE_CARLO = 500;
@@ -36,7 +36,7 @@ std::vector<SpectralDistribution> SurfaceRenderer::RenderChunk(
 	for (uint16_t x = 0; x < chunkInfo.width; ++x)
 	{
 		// Parallellize the for loop with openMP.
-		#pragma omp parallel for
+		//#pragma omp parallel for
 		for (uint16_t  y = 0; y < chunkInfo.height; ++y)
 		{
 			int index = (x + y * chunkInfo.width);
