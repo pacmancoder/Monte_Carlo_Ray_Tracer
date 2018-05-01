@@ -3,12 +3,16 @@
 #include <string>
 #include <random>
 
+#include <dcdr/logging/Logger.h>
+
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
-#include <glm/gtx/transform.hpp>
+#include <glm/gtx/rotate_vector.hpp>
+
 
 using namespace Mcrt;
+using namespace Dcdr::Logging;
 
 // --- Scene class functions --- //
 
@@ -69,7 +73,7 @@ bool Scene::intersectLamp(LightSourceIntersectionData* light_id, Ray r)
 		IntersectionData id_smallest_t;
 		id_smallest_t.t = 100000; // Ugly solution
 
-		const Object3D* intersecting_object = nullptr;
+		Object3D* intersecting_object = nullptr;
 		for (const auto& object : objects_)
 		{
 			IntersectionData id_local;
@@ -98,13 +102,15 @@ SpectralDistribution Scene::traceDiffuseRay(
 	IntersectionData id,
 	int iteration)
 {
+
 	r.has_intersected = true;
 	// Start by adding the local illumination part (shadow rays)
 	SpectralDistribution total_diffuse = traceLocalDiffuseRay(r, render_mode, id);
-	//if (!(iteration >= 2)) // Do not end here
-		// Add the indirect illumination part (Monte Carlo sampling)
-		total_diffuse = total_diffuse + traceIndirectDiffuseRay(r, render_mode, id, iteration);
-	return total_diffuse;
+    // Add the indirect illumination part (Monte Carlo sampling)
+    total_diffuse = total_diffuse + traceIndirectDiffuseRay(r, render_mode, id, iteration);
+    return total_diffuse;
+
+    return SpectralDistribution();
 }
 
 SpectralDistribution Scene::traceLocalDiffuseRay(
@@ -125,7 +131,7 @@ SpectralDistribution Scene::traceLocalDiffuseRay(
 			glm::vec3 differance = lightSource.second->getPointOnSurface((*dis_)(*gen_),(*dis_)(*gen_)) - shadow_ray.origin;
 			shadow_ray.direction = glm::normalize(differance);
 
-			SpectralDistribution brdf;// = id.material.color_diffuse / (2 * M_PI); // Dependent on inclination and azimuth
+			SpectralDistribution brdf; // = id.material.color_diffuse / (2 * M_PI); // Dependent on inclination and azimuth
 			float cos_theta = glm::dot(shadow_ray.direction, id.normal);
 
 			LightSourceIntersectionData shadow_ray_id;
@@ -136,15 +142,17 @@ SpectralDistribution Scene::traceLocalDiffuseRay(
 					-r.direction,
 					shadow_ray.direction,
 					id.normal,
-					id.material.color_diffuse * id.material.reflectance * (1 -id.material.specular_reflectance),
+					id.material.color_diffuse * id.material.reflectance * (1 - id.material.specular_reflectance),
 					id.material.diffuse_roughness);
 			}
 			else
+			{
 				brdf = evaluateLambertianBRDF(
-					-r.direction,
-					shadow_ray.direction,
-					id.normal,
-					id.material.color_diffuse * id.material.reflectance * (1 - id.material.specular_reflectance));
+						-r.direction,
+						shadow_ray.direction,
+						id.normal,
+						id.material.color_diffuse * id.material.reflectance * (1 - id.material.specular_reflectance));
+			}
 
 			if(intersectLamp(&shadow_ray_id, shadow_ray))
 			{
@@ -155,8 +163,7 @@ SpectralDistribution Scene::traceLocalDiffuseRay(
 					brdf *
 					shadow_ray_id.radiosity *
 					cos_theta *
-					light_solid_angle
-					;
+					light_solid_angle;
 			}
 		}
 	}
@@ -185,12 +192,18 @@ SpectralDistribution Scene::traceIndirectDiffuseRay(
 		// Uniform distribution over a hemisphere
 		auto inclination = static_cast<float>(std::acos(std::sqrt(rand1)));//glm::acos(1 - rand1);//glm::acos(1 -  2 * (*dis_)(*gen_));
 		auto azimuth = static_cast<float>(2 * M_PI * rand2);
-		// Change the actual vector
-        glm::vec3 random_direction = glm::normalize(glm::vec3(
-                glm::rotate(inclination, tangent) * glm::vec4(id.normal, 0)));
 
-        random_direction = glm::normalize(glm::vec3(
-                glm::rotate(azimuth, id.normal) * glm::vec4(random_direction, 0)));
+		// Change the actual vector
+        glm::vec3 random_direction = id.normal;
+        random_direction = glm::normalize(glm::rotate(
+                random_direction,
+                inclination,
+                tangent));
+
+        random_direction = glm::normalize(glm::rotate(
+                random_direction,
+                azimuth,
+                id.normal));
 
 		SpectralDistribution brdf;
 		if (id.material.diffuse_roughness)
@@ -269,11 +282,11 @@ SpectralDistribution Scene::traceRefractedRay(
 		// Reflected ray
 		// Change the material the ray is travelling in
 		recursive_ray_reflected.material = Material::air();
-		recursive_ray_reflected.origin = r.origin + id.t * r.direction +offset;
+		recursive_ray_reflected.origin = r.origin + id.t * r.direction + offset;
 		// Refracted ray
 		// Change the material the ray is travelling in
 		recursive_ray_refracted.material = id.material;
-		recursive_ray_refracted.origin = r.origin + id.t * r.direction -offset;
+		recursive_ray_refracted.origin = r.origin + id.t * r.direction - offset;
 		
 		SpectralDistribution to_return;
 		recursive_ray_reflected.direction = perfect_reflection;
@@ -308,33 +321,36 @@ SpectralDistribution Scene::traceRefractedRay(
 
 SpectralDistribution Scene::traceRay(Ray r, RenderMode render_mode, int iteration)
 {
+	const int MAX_ITERATIONS = 5;
 	IntersectionData id;
 	LightSourceIntersectionData lamp_id;
-
 	if (intersectLamp(&lamp_id, r)) // Ray hit light source
-		switch (render_mode)
-		{
-			case RenderMode::WHITTED_SPECULAR :
-				return lamp_id.radiosity / (M_PI * 2);
-			default :
-				return SpectralDistribution();
-		}
+    {
+        switch (render_mode)
+        {
+            case RenderMode::WHITTED_SPECULAR:
+                return lamp_id.radiosity / (M_PI * 2);
+            default:
+                return SpectralDistribution();
+        }
+    }
 	else if (intersect(&id, r))
-	{ // Ray hit another object
+	{
+	    // Ray hit another object
 		// Russian roulette
 		float random = (*dis_)(*gen_);
 		//float non_termination_probability = glm::max((1 - float(iteration) / 10), 0.5f);
 		auto non_termination_probability = static_cast<float>(iteration == 0 ? 1.0 : 0.8);
-		if (random > non_termination_probability || iteration > 20)
+		if (random > non_termination_probability || iteration > MAX_ITERATIONS)
 			return SpectralDistribution();
-		//if (iteration >= 4)
-		//	return SpectralDistribution();
 
 		// To make sure it does not intersect with itself again
 		glm::vec3 offset = id.normal * 0.00001f;
 		bool inside = false;
 		if (glm::dot(id.normal, r.direction) > 0) // The ray is inside an object
-			inside = true;
+        {
+            inside = true;
+        }
 		
 		float transmissivity = id.material.transmissivity;
 		float specularity = id.material.specular_reflectance;
@@ -446,13 +462,12 @@ SpectralDistribution Scene::traceRay(Ray r, RenderMode render_mode, int iteratio
 								id,
 								iteration) :
 							SpectralDistribution();
+
 					break;
 				}
 			}
 
-			total +=
-				(specular_part + diffuse_part) *
-				(1 - transmissivity);
+			total += (specular_part + diffuse_part) * (1 - transmissivity);
 		}
 		if (transmissivity)
 		{ // Completely or partly transmissive

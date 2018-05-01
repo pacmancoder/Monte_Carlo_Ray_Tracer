@@ -35,5 +35,7 @@ add_library(${PROJECT_NAME} STATIC ${INTERNAL_SOURCE} ${INTERNAL_HEADERS})
 
 target_link_libraries(${PROJECT_NAME} PUBLIC glm)
 
+target_link_libraries(${PROJECT_NAME} PRIVATE dcdr-logger)
+
 target_include_directories(${PROJECT_NAME} PUBLIC libs/include)
 target_include_directories(${PROJECT_NAME} PUBLIC include)

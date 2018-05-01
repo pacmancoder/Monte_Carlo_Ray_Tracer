@@ -9,7 +9,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
-#include <glm/gtx/transform.hpp>
+#include <glm/gtx/rotate_vector.hpp>
 
 using namespace Mcrt;
 
@@ -149,11 +149,16 @@ glm::vec3 Sphere::getPointOnSurface(float u, float v) const
 	float inclination = glm::acos(1 - 2 * u);
 	auto azimuth = static_cast<float>(2 * M_PI * v);
 
-    glm::vec3 random_direction = glm::normalize(glm::vec3(
-            glm::rotate(inclination, glm::vec3(0,1,0)) * glm::vec4(1, 0, 0, 0)));
+	glm::vec3 random_direction = glm::vec3(1, 0, 0);
+	random_direction = glm::normalize(glm::rotate(
+			random_direction,
+			inclination,
+			glm::vec3(0,1,0)));
 
-    random_direction = glm::normalize(glm::vec3(
-            glm::rotate(azimuth, glm::vec3(1, 0, 0)) * glm::vec4(random_direction, 0)));
+    random_direction = glm::normalize(glm::rotate(
+    		random_direction,
+    		azimuth,
+			glm::vec3(1, 0, 0)));
 
 	return position_ + random_direction * radius_;
 }
@@ -294,11 +299,16 @@ Ray LightSource::shootLightRay()
 	auto azimuth = static_cast<float>(2 * M_PI * rand2);
 	// Change the actual vector
 
-    glm::vec3 random_direction = glm::normalize(glm::vec3(
-            glm::rotate(inclination, tangent) * glm::vec4(normal, 0)));
+	glm::vec3 random_direction = normal;
+    random_direction = glm::normalize(glm::rotate(
+    		random_direction,
+    		inclination,
+			tangent));
 
-    random_direction = glm::normalize(glm::vec3(
-            glm::rotate(azimuth, normal) * glm::vec4(random_direction, 0)));
+    random_direction = glm::normalize(glm::rotate(
+    		random_direction,
+    		azimuth,
+			normal));
 
 	r.direction = random_direction;
 	r.material = Material::air();
