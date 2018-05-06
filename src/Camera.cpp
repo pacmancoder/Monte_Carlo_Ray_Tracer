@@ -41,8 +41,8 @@ Ray Camera::cast_ray(
 		float y,
 		uint16_t width,
 		uint16_t height,
-		uint16_t u,
-		uint16_t v) const
+		float u,
+		float v) const
 {
 	float aspect = float(width) / float(height);
 	float px = ((x + u - float(0.5)) / (float(width) - 1)) * 2 - 1;
