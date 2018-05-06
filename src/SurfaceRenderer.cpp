@@ -22,7 +22,7 @@ std::vector<SpectralDistribution> SurfaceRenderer::RenderChunk(
 {
 	static const int SUB_SAMPLING_CAUSTICS = 0;
 	static const int SUB_SAMPLING_MONTE_CARLO = 10;
-	static const int SUB_SAMPLING_DIRECT_SPECULAR = 5;
+	static const int SUB_SAMPLING_DIRECT_SPECULAR = 1;
 
 	auto c = scene.GetDefaultCamera();
 
